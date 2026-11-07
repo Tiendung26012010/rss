@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vương Quốc Trỗi Dậy</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600&family=Roboto+Slab:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14202b;--pan:#1e303e;--line:#2f4658;--tx:#ece6d4;--mu:#9fb0bb;--gold:#d3a24a;--red:#c4485a;--grn:#6aa561;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#e9eef1;--pan:#fff;--line:#c4d0d8;--tx:#16222c;--mu:#546875;--gold:#8f620f;--red:#a82f42;--grn:#3f7239;color-scheme:light}}
+:root[data-theme="dark"]{--bg:#14202b;--pan:#1e303e;--line:#2f4658;--tx:#ece6d4;--mu:#9fb0bb;--gold:#d3a24a;--red:#c4485a;--grn:#6aa561}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "Be Vietnam Pro",system-ui,sans-serif}
+.wrap{max-width:680px;margin:0 auto;padding:10px 12px 24px}
+h1{font:800 20px "Roboto Slab",Georgia,serif;margin:4px 0 8px;color:var(--gold)}
+.res{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pill{background:var(--pan);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+.pill b{display:block;font-size:15px}.pill small{color:var(--mu)}
+#status{min-height:24px;margin:8px 0;color:var(--mu);font-size:13px}
+nav{display:flex;gap:6px;margin-bottom:10px}
+nav button{flex:1}
+button{font:inherit;color:var(--tx);background:var(--pan);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--gold)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.on{background:var(--gold);color:#14202b;border-color:var(--gold);font-weight:600}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.card h3{font:600 15px "Roboto Slab",Georgia,serif;margin:0}
+.card p{margin:2px 0 0;color:var(--mu);font-size:13px}
+.ico{font-size:28px}
+.row{display:flex;gap:6px}
+.hide{display:none}
+canvas{width:100%;max-width:648px;aspect-ratio:1;display:block;border:2px solid var(--line);border-radius:10px;cursor:pointer;touch-action:manipulation}
+#info{margin-top:8px}
+#log{margin-top:14px;font-size:13px;color:var(--mu)}
+#log div{padding:2px 0;border-top:1px solid var(--line)}
+.win{color:var(--grn)}.lose{color:var(--red)}
+.foot{margin-top:12px;text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Vương Quốc Trỗi Dậy</h1>
+  <div class="res" id="res"></div>
+  <div id="status"></div>
+  <nav>
+    <button data-act="tab:city" id="t-city">Thành phố</button>
+    <button data-act="tab:map" id="t-map">Bản đồ</button>
+    <button data-act="tab:army" id="t-army">Quân đội</button>
+  </nav>
+  <section id="p-city"></section>
+  <section id="p-map" class="hide">
+    <canvas id="cv" width="648" height="648" aria-label="Bản đồ thế giới"></canvas>
+    <div id="info"></div>
+  </section>
+  <section id="p-army" class="hide"></section>
+  <div id="log"></div>
+  <div class="foot"><button data-act="reset">Chơi lại từ đầu</button></div>
+</div>
+<script>
+const R=['food','wood','stone','gold'],RI={food:'🌾',wood:'🪵',stone:'🪨',gold:'🪙'},RN={food:'Lương thực',wood:'Gỗ',stone:'Đá',gold:'Vàng'};
+const B={
+ hall:{n:'Tòa thị chính',i:'🏰',c:{wood:150,stone:150,gold:50},d:'Quyết định cấp tối đa của mọi công trình'},
+ farm:{n:'Nông trại',i:'🌾',r:'food',rate:1.5,c:{wood:60,stone:20}},
+ lumber:{n:'Xưởng gỗ',i:'🌲',r:'wood',rate:1.5,c:{food:60,stone:20}},
+ quarry:{n:'Mỏ đá',i:'⛰️',r:'stone',rate:1,c:{food:60,wood:60}},
+ mine:{n:'Mỏ vàng',i:'⛏️',r:'gold',rate:.6,c:{wood:80,stone:60}},
+ barracks:{n:'Doanh trại',i:'⚔️',c:{food:100,wood:100,stone:60},d:'Mở khóa lính mới, tăng sức chứa quân'}
+};
+const U={
+ inf:{n:'Bộ binh',i:'🛡️',c:{food:40,wood:20},a:10,h:40,req:1},
+ arc:{n:'Cung thủ',i:'🏹',c:{wood:50,gold:10},a:16,h:20,req:2},
+ cav:{n:'Kỵ binh',i:'🐎',c:{food:70,gold:30},a:24,h:35,req:3}
+};
+const N=18,C=9,T=36;
+let S,sel=null,tab='city',logs=[],sig={},cv=document.getElementById('cv'),g=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const sum=o=>Object.values(o).reduce((a,b)=>a+b,0);
+const dist=(x,y)=>Math.hypot(x-C,y-C);
+const cap=()=>1500*S.lv.hall;
+const prod=r=>Object.keys(B).reduce((a,k)=>a+(B[k].r===r?B[k].rate*S.lv[k]:0),0);
+const cost=k=>Object.fromEntries(Object.entries(B[k].c).map(([r,v])=>[r,Math.round(v*Math.pow(1.7,S.lv[k]-1))]));
+const can=c=>R.every(r=>(c[r]||0)<=S.res[r]);
+const pay=c=>R.forEach(r=>S.res[r]-=(c[r]||0));
+const chips=c=>Object.entries(c).map(([r,v])=>RI[r]+' '+v).join('  ');
+const fmt=ms=>Math.max(0,Math.ceil(ms/1000))+'s';
+function log(t,cls){logs.unshift([t,cls||'']);logs=logs.slice(0,6)}
+function free(){let x,y;do{x=rnd(0,N-1);y=rnd(0,N-1)}while(dist(x,y)<2||S.camps.some(o=>o.x==x&&o.y==y)||S.nodes.some(o=>o.x==x&&o.y==y));return[x,y]}
+function newCamp(){const[x,y]=free();S.camps.push({x,y,l:Math.max(1,Math.min(5,Math.ceil(dist(x,y)/2)+rnd(-1,0)))})}
+function newNode(){const[x,y]=free();S.nodes.push({x,y,t:R[rnd(0,3)],l:rnd(1,3)})}
+function fresh(){
+ S={res:{food:500,wood:500,stone:300,gold:150},lv:{hall:1,farm:1,lumber:1,quarry:1,mine:1,barracks:1},tr:{inf:0,arc:0,cav:0},q:null,m:null,camps:[],nodes:[],score:0,t:Date.now()};
+ for(let i=0;i<7;i++)newCamp();for(let i=0;i<12;i++)newNode();
+ logs=[];log('Chào mừng, lãnh chúa! Hãy xây dựng thành phố và huấn luyện quân.');
+}
+function load(){
+ try{const s=localStorage.getItem('vqtd');if(s){S=JSON.parse(s);if(!S||!S.lv)throw 0;
+  const dt=Math.min((Date.now()-S.t)/1000,3600);R.forEach(r=>S.res[r]=Math.min(cap(),S.res[r]+prod(r)*dt));return}}catch(e){}
+ fresh();
+}
+function save(){S.t=Date.now();try{localStorage.setItem('vqtd',JSON.stringify(S))}catch(e){}}
+function upgrade(k){
+ if(S.q)return log('Đang có công trình đang nâng cấp.');
+ const lv=S.lv[k];
+ if(k=='hall'?lv>=8:lv>=S.lv.hall)return log(k=='hall'?'Tòa thị chính đã đạt cấp tối đa.':'Cần nâng Tòa thị chính trước.');
+ const c=cost(k);if(!can(c))return log('Không đủ tài nguyên.');
+ pay(c);const d=(3+4*lv)*1000;S.q={k,end:Date.now()+d};log('Bắt đầu nâng cấp '+B[k].n+'.');
+}
+function away(){return S.m?sum(S.m.army):0}
+function train(u,n){
+ const d=U[u];if(S.lv.barracks<d.req)return log('Cần Doanh trại cấp '+d.req+'.');
+ if(sum(S.tr)+away()+n>40*S.lv.barracks)return log('Doanh trại đã đầy. Hãy nâng cấp để chứa thêm quân.');
+ const c=Object.fromEntries(Object.entries(d.c).map(([r,v])=>[r,v*n]));
+ if(!can(c))return log('Không đủ tài nguyên.');
+ pay(c);S.tr[u]+=n;log('Huấn luyện '+n+' '+d.n+'.');
+}
+const atk=a=>Object.keys(U).reduce((s,u)=>s+U[u].a*(a[u]||0),0);
+const hp=a=>Object.keys(U).reduce((s,u)=>s+U[u].h*(a[u]||0),0);
+const ratio=(a,L)=>(atk(a)*hp(a))/(60*Math.pow(L,1.8)*300*L*L);
+function send(x,y){
+ if(S.m)return log('Quân đang trên đường.');
+ if(!sum(S.tr))return log('Chưa có quân để xuất.');
+ const army={...S.tr};S.tr={inf:0,arc:0,cav:0};
+ S.m={x,y,army,phase:'go',t0:Date.now(),dur:Math.max(3,dist(x,y)*1.5)*1000,loot:{}};
+ sel=null;log('Quân xuất phát!');
+}
+function surv(a,f){const o={};for(const u in a)o[u]=Math.floor(a[u]*(1-f));return o}
+function arrive(){
+ const m=S.m,camp=S.camps.find(o=>o.x==m.x&&o.y==m.y),node=S.nodes.find(o=>o.x==m.x&&o.y==m.y);
+ if(camp){
+  const r=ratio(m.army,camp.l);
+  if(r>=1){
+   m.army=surv(m.army,Math.min(.6,Math.max(.03,.35/r)));
+   R.forEach(k=>m.loot[k]=rnd(40,70)*camp.l);
+   S.score+=camp.l*10;S.camps=S.camps.filter(o=>o!==camp);newCamp();
+   log('Chiến thắng trại man tộc cấp '+camp.l+'! +'+camp.l*10+' điểm.','win');
+  }else{
+   m.army=surv(m.army,.9);log('Thất bại trước trại man tộc cấp '+camp.l+'. Phần lớn quân đã hy sinh.','lose');
+  }
+ }else if(node){
+  m.loot[node.t]=150*node.l;S.nodes=S.nodes.filter(o=>o!==node);newNode();
+  log('Thu thập '+RN[node.t]+' thành công.','win');
+ }
+ m.phase='back';m.t0=Date.now();
+}
+function tick(dt){
+ R.forEach(r=>{if(S.res[r]<cap())S.res[r]=Math.min(cap(),S.res[r]+prod(r)*dt)});
+ const now=Date.now();
+ if(S.q&&now>=S.q.end){S.lv[S.q.k]++;log(B[S.q.k].n+' lên cấp '+S.lv[S.q.k]+'.','win');S.q=null}
+ if(S.m&&now-S.m.t0>=S.m.dur){
+  if(S.m.phase=='go')arrive();
+  else{for(const u in S.m.army)S.tr[u]+=S.m.army[u];R.forEach(r=>S.res[r]=Math.min(cap(),S.res[r]+(S.m.loot[r]||0)));S.m=null;log('Quân đã trở về thành.')}
+ }
+}
+function setHTML(id,h){if(sig[id]!==h){sig[id]=h;$(id).innerHTML=h}}
+function ui(){
+ setHTML('res',R.map(r=>`<div class="pill">${RI[r]} <small>${RN[r]}</small><b>${Math.floor(S.res[r])}</b><small>+${prod(r).toFixed(1)}/s · tối đa ${cap()}</small></div>`).join(''));
+ const now=Date.now(),st=[];
+ if(S.q)st.push('🔨 '+B[S.q.k].n+' → cấp '+(S.lv[S.q.k]+1)+' · '+fmt(S.q.end-now));
+ if(S.m)st.push((S.m.phase=='go'?'🚩 Quân đang hành quân':'🏳️ Quân đang trở về')+' · '+fmt(S.m.dur-(now-S.m.t0)));
+ const s=st.join('   ')||'Không có hoạt động nào.';if(sig.st!==s){sig.st=s;$('status').textContent=s}
+ ['city','map','army'].forEach(t=>{$('p-'+t).classList.toggle('hide',t!=tab);$('t-'+t).classList.toggle('on',t==tab)});
+ setHTML('p-city',Object.keys(B).map(k=>{
+  const c=cost(k),lv=S.lv[k],mx=k=='hall'?lv>=8:lv>=S.lv.hall;
+  const d=B[k].r?`Sản xuất ${(B[k].rate*lv).toFixed(1)} ${RN[B[k].r]}/s`:B[k].d;
+  return `<div class="card"><div class="row"><span class="ico">${B[k].i}</span><div><h3>${B[k].n} · cấp ${lv}</h3><p>${d}</p><p>${mx?'Đã đạt cấp tối đa hiện tại':'Giá: '+chips(c)}</p></div></div>
+  <button data-act="up:${k}" ${(mx||S.q||!can(c))?'disabled':''}>Nâng cấp</button></div>`}).join(''));
+ setHTML('p-army',`<p>Quân: ${sum(S.tr)} ở thành · ${away()} đang ngoài · sức chứa ${40*S.lv.barracks}</p>`+Object.keys(U).map(u=>{
+  const d=U[u],ok=S.lv.barracks>=d.req;
+  return `<div class="card"><div class="row"><span class="ico">${d.i}</span><div><h3>${d.n} × ${S.tr[u]}</h3><p>Công ${d.a} · Máu ${d.h} · ${ok?'Giá: '+chips(d.c):'Cần Doanh trại cấp '+d.req}</p></div></div>
+  <div class="row"><button data-act="tr:${u}:1" ${ok&&can(d.c)?'':'disabled'}>+1</button><button data-act="tr:${u}:10" ${ok&&can(Object.fromEntries(Object.entries(d.c).map(([r,v])=>[r,v*10])))?'':'disabled'}>+10</button></div></div>`}).join(''));
+ let h='<div class="card"><p>Chạm vào một ô trên bản đồ để xem chi tiết.</p></div>';
+ if(sel){
+  const camp=S.camps.find(o=>o.x==sel.x&&o.y==sel.y),node=S.nodes.find(o=>o.x==sel.x&&o.y==sel.y);
+  const d=Math.round(dist(sel.x,sel.y)*1.5);
+  const btn=l=>`<button data-act="send" ${(S.m||!sum(S.tr))?'disabled':''}>${l}</button>`;
+  if(camp){const r=ratio(S.tr,camp.l),w=!sum(S.tr)?'Chưa có quân':r>=1.3?'Dễ thắng':r>=1?'Sát nút':'Sẽ thua';
+   h=`<div class="card"><div><h3>⛺ Trại man tộc cấp ${camp.l}</h3><p>Hành quân ${d}s mỗi chiều · Dự đoán: ${w}</p></div>${btn('Tấn công')}</div>`}
+  else if(node)h=`<div class="card"><div><h3>${RI[node.t]} Mỏ ${RN[node.t]} cấp ${node.l}</h3><p>Thu về ${150*node.l} · Hành quân ${d}s mỗi chiều</p></div>${btn('Thu thập')}</div>`;
+  else if(sel.x==C&&sel.y==C)h='<div class="card"><div><h3>🏰 Thành của bạn</h3><p>Điểm: '+S.score+'</p></div></div>';
+  else h='<div class="card"><p>Ô đất trống.</p></div>';
+ }
+ setHTML('info',h);
+ setHTML('log',logs.map(l=>`<div class="${l[1]}">${l[0]}</div>`).join(''));
+}
+function hash(x,y){const v=Math.sin(x*127.1+y*311.7)*43758.5;return v-Math.floor(v)}
+function draw(){
+ const now=Date.now();
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+  const h=hash(x,y);g.fillStyle=`hsl(${105+h*20},${32+h*10}%,${24+h*8}%)`;g.fillRect(x*T,y*T,T,T);
+ }
+ g.strokeStyle='rgba(255,255,255,.05)';g.lineWidth=1;
+ for(let i=0;i<=N;i++){g.beginPath();g.moveTo(i*T,0);g.lineTo(i*T,N*T);g.moveTo(0,i*T);g.lineTo(N*T,i*T);g.stroke()}
+ g.textAlign='center';g.textBaseline='middle';
+ const ic=(x,y,e,s)=>{g.font=(s||22)+'px sans-serif';g.fillText(e,x*T+T/2,y*T+T/2)};
+ S.nodes.forEach(o=>ic(o.x,o.y,RI[o.t]));
+ S.camps.forEach(o=>{ic(o.x,o.y,'⛺');g.font='600 11px sans-serif';g.fillStyle='#fff';g.fillText('Lv'+o.l,o.x*T+T/2,o.y*T+T-5)});
+ ic(C,C,'🏰',28);
+ if(S.m){
+  const p=Math.min(1,(now-S.m.t0)/S.m.dur),f=S.m.phase=='go'?p:1-p;
+  const ax=(C+.5)*T,ay=(C+.5)*T,bx=(S.m.x+.5)*T,by=(S.m.y+.5)*T;
+  g.strokeStyle='#d3a24a';g.setLineDash([6,5]);g.lineWidth=2;g.beginPath();g.moveTo(ax,ay);g.lineTo(bx,by);g.stroke();g.setLineDash([]);
+  g.font='20px sans-serif';g.fillText('🚩',ax+(bx-ax)*f,ay+(by-ay)*f);
+ }
+ if(sel){g.strokeStyle='#d3a24a';g.lineWidth=3;g.strokeRect(sel.x*T+1.5,sel.y*T+1.5,T-3,T-3)}
+}
+let lastT=performance.now();
+function loop(t){const dt=Math.min(1,(t-lastT)/1000);lastT=t;tick(dt);ui();draw();requestAnimationFrame(loop)}
+cv.addEventListener('click',e=>{
+ const r=cv.getBoundingClientRect();
+ sel={x:Math.min(N-1,Math.floor((e.clientX-r.left)/r.width*N)),y:Math.min(N-1,Math.floor((e.clientY-r.top)/r.height*N))};
+});
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+ const [a,p,q]=b.dataset.act.split(':');
+ if(a=='tab')tab=p;
+ else if(a=='up')upgrade(p);
+ else if(a=='tr')train(p,+q);
+ else if(a=='send'&&sel)send(sel.x,sel.y);
+ else if(a=='reset'&&confirm('Xóa toàn bộ tiến trình và chơi lại?')){fresh();sel=null;save()}
+ save();
+});
+load();setInterval(save,5000);requestAnimationFrame(loop);
+</script>
+</body>
+</html>
